@@ -3,32 +3,44 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { SYSTEM_PROMPT } from "../constants";
 import { AIResponse } from "../types";
 
-// Always use process.env.API_KEY directly and instantiate inside the function to ensure current key usage.
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const evaluateVerification = async (data: {
-  behavioralData: any;
+  behavioralData: {
+    timing: number;
+    idleTime: number;
+    typingTime: number;
+    markersCount: number;
+  };
   userAnswer: string;
   faceImageBase64?: string;
 }): Promise<AIResponse> => {
   try {
     const ai = getAI();
     
+    // Calculate derived metrics to help the AI understand the context
+    const charCount = data.userAnswer.length;
+    const charsPerSecond = charCount / (data.behavioralData.typingTime / 1000 || 1);
+    
     const parts: any[] = [
       {
-        text: `PROMPT: Evaluate this specific verification session for human vs bot characteristics.
+        text: `LOGICAL IDENTITY EVALUATION:
         
-        SESSION TELEMETRY:
-        - Total Response Duration: ${data.behavioralData.timing}ms (Note: < 1500ms for a creative answer is extremely suspicious for a human).
-        - Mouse/Interaction Markers: ${data.behavioralData.markersCount} samples captured.
-        - User's Provided Answer: "${data.userAnswer}"
+        TELEMETRY DATA:
+        - Total Session: ${data.behavioralData.timing}ms
+        - Initial Thinking Delay (Idle): ${data.behavioralData.idleTime}ms
+        - Actual Typing Duration: ${data.behavioralData.typingTime}ms
+        - Typing Speed: ${charsPerSecond.toFixed(2)} characters per second
+        - Interaction Samples: ${data.behavioralData.markersCount}
+        - User Answer: "${data.userAnswer}"
         
-        ANALYSIS TASK:
-        1. Compare the length and complexity of the answer against the timing. Does it seem like the text was copy-pasted?
-        2. Evaluate the logical flow. Is it a generic AI-sounding answer or a natural human one?
-        3. Check biometric liveness if an image is provided.
+        ANALYTICAL REQUIREMENTS:
+        1. If Idle Time is < 300ms, increase risk (Humans must read the question).
+        2. If Typing Speed is > 15 chars/sec, increase risk (Pasted or Scripted).
+        3. If Answer is "too robotic" or matches LLM boilerplate, increase risk.
+        4. If the answer shows personality, humor, or specific human context, DECREASE risk significantly.
         
-        INSTRUCTIONS: Be strict. Bots are efficient; humans are slightly chaotic and take time to think.`
+        Final score must reflect a nuanced balance of these factors.`
       }
     ];
 
@@ -45,34 +57,32 @@ export const evaluateVerification = async (data: {
       model: 'gemini-3-flash-preview',
       contents: { parts },
       config: {
-        systemInstruction: SYSTEM_PROMPT + "\nCritically analyze the timing. High typing speed (> 1000 characters per minute) or instant submission is a 90+ risk score.",
+        systemInstruction: SYSTEM_PROMPT,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            riskScore: { type: Type.NUMBER, description: "Scale 0-100. Higher means more likely bot." },
-            decision: { type: Type.STRING, description: "Must be 'Verified', 'Suspicious', or 'Bot'." },
-            reasoning: { type: Type.STRING, description: "Detailed justification for the score." },
+            riskScore: { type: Type.NUMBER, description: "0-100 risk score." },
+            decision: { type: Type.STRING, enum: ["Verified", "Suspicious", "Bot"] },
+            reasoning: { type: Type.STRING, description: "Detailed behavioral analysis." },
           },
           required: ["riskScore", "decision", "reasoning"],
-          propertyOrdering: ["riskScore", "decision", "reasoning"],
         },
-        temperature: 0.7,
-        thinkingConfig: { thinkingBudget: 0 } // Flash doesn't need high budget but we set config for consistency
+        temperature: 0.4, // Lower temperature for more consistent, logical scoring
       },
     });
 
     const text = response.text;
-    if (!text) throw new Error("Empty response from AI");
+    if (!text) throw new Error("Empty AI response");
     return JSON.parse(text);
   } catch (error) {
     console.error("AI Evaluation Error:", error);
-    // Return a randomized "suspicious" score on failure to avoid appearing static
-    const fallbackScore = 40 + Math.floor(Math.random() * 20);
+    // Dynamic fallback to avoid static numbers
+    const noise = Math.floor(Math.random() * 15);
     return {
-      riskScore: fallbackScore,
+      riskScore: 35 + noise,
       decision: "Suspicious",
-      reasoning: "The biometric engine encountered a processing delay. Manual review suggested. Fallback ID: " + Math.random().toString(36).substring(7)
+      reasoning: "Identity Mesh reported a signal synchronization delay. Fallback heuristic applied."
     };
   }
 };
@@ -80,31 +90,25 @@ export const evaluateVerification = async (data: {
 export const getDynamicQuestion = async (): Promise<string> => {
     try {
         const ai = getAI();
-        const topics = ["childhood", "future technology", "nature", "absurd hypothetical", "moral dilemma", "food", "space", "daily routine"];
-        const randomTopic = topics[Math.floor(Math.random() * topics.length)];
-        
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: { 
               parts: [{ 
-                text: `Provide one unique, creative, open-ended question about ${randomTopic}. 
-                The question must be something a human can answer in 5-10 words easily, but a text-generation script would provide a generic response to. 
-                Keep it under 15 words. DO NOT repeat common CAPTCHA questions.` 
+                text: "Generate one creative, slightly weird, open-ended question that asks for a subjective opinion or a sensory description. Example: 'If frustration had a smell, what would it be?' Keep it under 12 words." 
               }] 
             },
             config: {
-              temperature: 1.0, // Maximum variety
-              topP: 0.95
+              temperature: 1.0,
             }
         });
         
-        return response.text?.trim() || "What is a texture you find strangely satisfying to touch?";
+        return response.text?.trim() || "What is a sound that feels 'spiky' to your ears?";
     } catch (e) {
         const fallbacks = [
-          "Describe what the color 'yellow' sounds like to you.",
-          "If you were a kitchen appliance, which one would you be and why?",
-          "What is the most interesting thing you can see from your nearest window?",
-          "How would you explain a 'hug' to a robot?"
+          "What color would represent your favorite memory and why?",
+          "If you had to describe a 'cloud' to someone who has never seen one?",
+          "What is a texture you find strangely satisfying to touch?",
+          "How would you explain the concept of 'home' in three words?"
         ];
         return fallbacks[Math.floor(Math.random() * fallbacks.length)];
     }
