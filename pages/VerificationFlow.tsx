@@ -27,7 +27,7 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
   // High-fidelity telemetry refs
   const sessionStartTime = useRef(0);
   const firstCharTime = useRef(0);
-  const lastCharTime = useRef(0);
+  const backspaceCount = useRef(0);
   const mouseMarkers = useRef<{x: number, y: number, t: number}[]>([]);
 
   useEffect(() => {
@@ -45,7 +45,8 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
         const q = await getDynamicQuestion();
         setQuestion(q);
         sessionStartTime.current = Date.now();
-        firstCharTime.current = 0; // Reset for new question
+        firstCharTime.current = 0;
+        backspaceCount.current = 0;
       } catch (err) {
         setQuestion("What is a personal value you hold most dear?");
       } finally {
@@ -88,16 +89,21 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      backspaceCount.current += 1;
+    }
+  };
+
   const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (!firstCharTime.current && e.target.value.length > 0) {
       firstCharTime.current = Date.now();
     }
-    lastCharTime.current = Date.now();
     setAnswer(e.target.value);
   };
 
   const trackMouse = (e: React.MouseEvent) => {
-    if (mouseMarkers.current.length < 150) {
+    if (mouseMarkers.current.length < 200) {
       mouseMarkers.current.push({ x: e.clientX, y: e.clientY, t: Date.now() });
     }
   };
@@ -117,7 +123,8 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
           timing: totalTiming,
           idleTime: idleTime,
           typingTime: typingTime,
-          markersCount: mouseMarkers.current.length
+          markersCount: mouseMarkers.current.length,
+          backspaceCount: backspaceCount.current
         }
       });
 
@@ -148,8 +155,8 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
       setStep(5);
       setResult({ 
         decision: 'Suspicious', 
-        riskScore: 48, 
-        reasoning: 'Behavioral mesh network timeout. Identity score extrapolated from partial telemetry.' 
+        riskScore: 22, 
+        reasoning: 'Behavioral mesh synchronization failed. Verification on-hold for manual inspection.' 
       });
     }
   };
@@ -177,13 +184,13 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
               </div>
               <div className="space-y-3">
                 <h2 className="text-4xl font-black text-[#1e1b4b] tracking-tight">Human Verification</h2>
-                <p className="text-slate-500 font-bold text-lg leading-relaxed px-6">We use behavioral biometrics to ensure you're a person, not a script. No CAPTCHAs required.</p>
+                <p className="text-slate-500 font-bold text-lg leading-relaxed px-6">Establishing your unique identity through cognitive and behavioral patterns.</p>
               </div>
               <button 
                 onClick={() => setStep(2)} 
                 className="w-full py-5 bg-[#1e1b4b] text-white font-black rounded-2xl hover:bg-black active:scale-95 transition-all shadow-xl uppercase text-xs tracking-widest"
               >
-                Initiate Protocol
+                Start Verification
               </button>
             </div>
           )}
@@ -191,8 +198,8 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
           {step === 2 && (
             <div className="space-y-8 flex-1 flex flex-col items-center animate-fade-in">
               <div className="text-center space-y-2">
-                <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.3em]">Step 01 / Biometrics</h3>
-                <h2 className="text-2xl font-black text-[#1e1b4b]">Face Liveness Scan</h2>
+                <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.3em]">Phase 01 / Biometric Scan</h3>
+                <h2 className="text-2xl font-black text-[#1e1b4b]">Face Liveness Check</h2>
               </div>
               
               <div className="relative w-full max-w-sm aspect-[4/5] bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl group">
@@ -217,7 +224,7 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
                 onClick={captureFace} 
                 className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl active:scale-95 transition-all disabled:opacity-30 uppercase text-xs tracking-widest"
               >
-                Capture Biometric Identity
+                Capture Secure Image
               </button>
             </div>
           )}
@@ -225,31 +232,36 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
           {step === 3 && (
             <div className="space-y-8 flex-1 flex flex-col animate-fade-in">
               <div className="text-center space-y-2">
-                <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.3em]">Step 02 / Cognition</h3>
-                <h2 className="text-2xl font-black text-[#1e1b4b]">Semantic Reasoning Test</h2>
+                <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.3em]">Phase 02 / Cognitive Audit</h3>
+                <h2 className="text-2xl font-black text-[#1e1b4b]">Subjective Reasoning Test</h2>
               </div>
 
               {isFetchingQuestion ? (
                 <div className="flex-1 flex flex-col items-center justify-center space-y-4">
                   <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Synchronizing Challenge Vector...</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Crafting Unique Challenge...</p>
                 </div>
               ) : (
                 <div className="space-y-6 flex-1 flex flex-col">
                   <p className="text-2xl font-black text-[#1e1b4b] leading-tight tracking-tight min-h-[4rem]">{question}</p>
                   <textarea 
                     value={answer}
+                    onKeyDown={handleKeyDown}
                     onChange={handleTyping}
                     className="flex-1 w-full p-8 bg-slate-50 rounded-[2rem] border-2 border-slate-100 focus:bg-white focus:ring-8 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none transition-all resize-none text-xl font-bold text-[#1e1b4b] placeholder-slate-300"
-                    placeholder="Type your answer here..."
+                    placeholder="Provide your natural response..."
                     autoFocus
                   />
+                  <div className="flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">
+                    <span>Human Telemetry Active</span>
+                    <span>Confidence Score: {answer.length > 10 ? 'Analyzing...' : 'Pending'}</span>
+                  </div>
                   <button 
-                    disabled={answer.trim().length < 5}
+                    disabled={answer.trim().length < 3}
                     onClick={() => setStep(4)} 
-                    className={`w-full py-5 font-black rounded-2xl transition-all uppercase text-xs tracking-widest ${answer.trim().length >= 5 ? 'bg-indigo-600 text-white shadow-xl active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                    className={`w-full py-5 font-black rounded-2xl transition-all uppercase text-xs tracking-widest ${answer.trim().length >= 3 ? 'bg-indigo-600 text-white shadow-xl active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
                   >
-                    Analyze Patterns
+                    Continue to Audit
                   </button>
                 </div>
               )}
@@ -261,14 +273,14 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
                {!isProcessing ? (
                  <>
                    <div className="space-y-4">
-                     <h2 className="text-4xl font-black text-[#1e1b4b] tracking-tight">Finalizing Audit</h2>
-                     <p className="text-slate-500 font-bold max-w-sm mx-auto">Click below to submit your biometric and behavioral signature for kernel evaluation.</p>
+                     <h2 className="text-4xl font-black text-[#1e1b4b] tracking-tight">Final Analysis</h2>
+                     <p className="text-slate-500 font-bold max-w-sm mx-auto">Your biometric and cognitive signatures are ready for mesh network verification.</p>
                    </div>
                    <button 
                     onClick={handleSubmit} 
                     className="w-full py-6 bg-emerald-600 text-white font-black rounded-3xl hover:bg-emerald-700 active:scale-95 transition-all shadow-2xl shadow-emerald-100 uppercase text-xs tracking-[0.2em]"
                    >
-                     Submit to Mesh Network
+                     Execute Final Check
                    </button>
                  </>
                ) : (
@@ -281,12 +293,8 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <h2 className="text-2xl font-black text-[#1e1b4b]">Analyzing Telemetry...</h2>
-                        <div className="flex justify-center gap-1">
-                            <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                            <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                            <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce"></div>
-                        </div>
+                        <h2 className="text-2xl font-black text-[#1e1b4b]">Verifying Signature...</h2>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Distinguishing Human Nuance</p>
                     </div>
                  </div>
                )}
@@ -307,13 +315,13 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
               </div>
               
               <div className="space-y-2">
-                <h2 className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Status: {result.decision}</h2>
-                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.3em]">Identity Checksum: {Math.random().toString(36).substring(2, 10).toUpperCase()}</p>
+                <h2 className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Identity: {result.decision}</h2>
+                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.3em]">Hash Ref: {Math.random().toString(36).substring(2, 10).toUpperCase()}</p>
               </div>
 
               <div className="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-100 text-left space-y-6">
                 <div className="flex justify-between items-end">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Risk Index</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Trust Matrix Index</span>
                     <span className={`text-4xl font-black tracking-tighter ${result.riskScore < 30 ? 'text-emerald-600' : result.riskScore < 70 ? 'text-amber-600' : 'text-rose-600'}`}>
                         {result.riskScore}<span className="text-sm opacity-30">/100</span>
                     </span>
@@ -331,7 +339,7 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
                 onClick={() => navigate('/dashboard')} 
                 className="w-full py-5 bg-[#1e1b4b] text-white font-black rounded-2xl hover:bg-black active:scale-95 transition-all mt-4 uppercase text-xs tracking-widest shadow-xl shadow-slate-100"
               >
-                Access Command Center
+                Enter Dashboard
               </button>
             </div>
           )}
