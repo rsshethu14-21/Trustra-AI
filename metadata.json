@@ -1,0 +1,7 @@
+{
+  "name": "Trustra AI - Identity Verification Platform",
+  "description": "A startup-ready identity verification platform that uses behavioral AI to distinguish humans from bots with a dynamic risk scoring engine.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
