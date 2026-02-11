@@ -13,7 +13,8 @@ interface VerificationFlowProps {
 const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete }) => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [question, setQuestion] = useState('Loading verification challenge...');
+  const [question, setQuestion] = useState('');
+  const [isFetchingQuestion, setIsFetchingQuestion] = useState(false);
   const [answer, setAnswer] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -35,12 +36,15 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
 
   useEffect(() => {
     const fetchChallenge = async () => {
+      setIsFetchingQuestion(true);
       try {
         const q = await getDynamicQuestion();
         setQuestion(q);
         startTime.current = Date.now();
       } catch (err) {
         setQuestion("What is a personal value you hold most dear?");
+      } finally {
+        setIsFetchingQuestion(false);
       }
     };
     if (step === 3) fetchChallenge();
@@ -130,7 +134,11 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
     } catch (err) {
       setIsProcessing(false);
       setStep(5);
-      setResult({ decision: 'Suspicious', riskScore: 50, reasoning: 'Kernel logic mismatch.' });
+      setResult({ 
+        decision: 'Suspicious', 
+        riskScore: 50, 
+        reasoning: 'The AI service returned an unexpected response format. Manual identity mesh review required.' 
+      });
     }
   };
 
@@ -201,22 +209,31 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
           {step === 3 && (
             <div className="space-y-6 flex-1">
               <h3 className="text-xs font-black text-[#1e1b4b] opacity-40 uppercase tracking-[0.3em]">Semantic Consistency Test</h3>
-              <p className="text-2xl font-black text-[#1e1b4b] leading-tight min-h-[4rem] tracking-tight">{question}</p>
-              <textarea 
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                className="w-full p-6 h-40 bg-slate-50 rounded-3xl border border-slate-200 focus:ring-8 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none transition-all resize-none text-lg font-bold text-[#1e1b4b] placeholder-slate-400"
-                placeholder="Compose your response naturally..."
-                autoFocus
-              />
-              <button 
-                type="button"
-                disabled={answer.length < 5}
-                onClick={handleNextStep} 
-                className={`w-full py-4 font-black rounded-2xl transition-all uppercase text-xs tracking-widest ${answer.length >= 5 ? 'bg-indigo-600 text-white shadow-xl active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-              >
-                Process Reasoning
-              </button>
+              {isFetchingQuestion ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm font-black text-[#1e1b4b] opacity-40 uppercase tracking-widest">Generating Dynamic Challenge...</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-2xl font-black text-[#1e1b4b] leading-tight min-h-[4rem] tracking-tight">{question}</p>
+                  <textarea 
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    className="w-full p-6 h-40 bg-slate-50 rounded-3xl border border-slate-200 focus:ring-8 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none transition-all resize-none text-lg font-bold text-[#1e1b4b] placeholder-slate-400"
+                    placeholder="Compose your response naturally..."
+                    autoFocus
+                  />
+                  <button 
+                    type="button"
+                    disabled={answer.length < 3}
+                    onClick={handleNextStep} 
+                    className={`w-full py-4 font-black rounded-2xl transition-all uppercase text-xs tracking-widest ${answer.length >= 3 ? 'bg-indigo-600 text-white shadow-xl active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                  >
+                    Process Reasoning
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -287,6 +304,26 @@ const VerificationFlow: React.FC<VerificationFlowProps> = ({ user, onComplete })
           )}
         </div>
       </div>
+      <style>{`
+        @keyframes scan {
+          0%, 100% { top: 10%; }
+          50% { top: 90%; }
+        }
+        .animate-scan {
+          animation: scan 2s ease-in-out infinite;
+          position: absolute;
+          width: 100%;
+        }
+        @keyframes bounce-slow {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-slow {
+          animation: bounce-slow 3s ease-in-out infinite;
+        }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fade-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}</style>
     </Layout>
   );
 };
